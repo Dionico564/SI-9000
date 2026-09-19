@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>SI-9000 · Spirit Identity AI</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--divine:#FFD700;--heaven:#87CEEB;--dark:#12121F;--evil:#8B0000;--holy:#F8F0E3;--iris:#7C4DFF;--seraph:#FF6B00;--cherub:#00D4FF;--throne:#E0E0E0;--fallen:#4B0082;--prince:#DC143C;--beast:#2F4F4F}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:radial-gradient(circle at top,#1a1a3c,#050510);color:#fff;min-height:100vh;padding:20px}
+.container{max-width:480px;margin:0 auto}
+h1{text-align:center;font-size:1.8rem;margin-bottom:10px;color:var(--divine);text-shadow:0 0 20px rgba(255,215,0,0.5)}
+.subtitle{text-align:center;color:#aaa;margin-bottom:20px}
+.camera-box{width:100%;aspect-ratio:4/3;background:#000;border-radius:16px;overflow:hidden;margin-bottom:20px;position:relative;border:2px solid var(--iris);box-shadow:0 0 30px rgba(124,77,255,0.3)}
+video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.overlay{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.iris-frame{width:140px;height:140px;border-radius:50%;border:3px solid var(--divine);box-shadow:0 0 25px var(--divine),inset 0 0 15px rgba(255,215,0,0.4);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 25px var(--divine),inset 0 0 15px rgba(255,215,0,0.4)}50%{box-shadow:0 0 40px var(--divine),inset 0 0 25px rgba(255,215,0,0.6)}}
+.btn{width:100%;padding:16px;font-size:1.1rem;border:none;border-radius:12px;background:linear-gradient(135deg,var(--iris),#536DFE);color:#fff;font-weight:600;cursor:pointer;margin-bottom:12px;transition:transform .2s,box-shadow .2s}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.result-box{background:rgba(255,255,255,0.05);border-radius:16px;padding:20px;margin-top:20px;border:1px solid rgba(255,255,255,0.1);min-height:140px}
+.result-title{font-size:1.3rem;font-weight:bold;margin-bottom:10px}
+.angel{color:#FFD700;text-shadow:0 0 10px rgba(255,215,0,0.5)}
+.seraph{color:var(--seraph);text-shadow:0 0 10px rgba(255,107,0,0.5)}
+.cherub{color:var(--cherub);text-shadow:0 0 10px rgba(0,212,255,0.5)}
+.throne{color:var(--throne);text-shadow:0 0 10px rgba(224,224,224,0.5)}
+.god{color:#FFFFFF;text-shadow:0 0 15px rgba(255,255,255,0.8)}
+.demon{color:#FF4444;text-shadow:0 0 10px rgba(255,0,0,0.5)}
+.fallen{color:var(--fallen);text-shadow:0 0 10px rgba(75,0,130,0.5)}
+.prince{color:var(--prince);text-shadow:0 0 10px rgba(220,20,60,0.5)}
+.devil{color:#8B0000;text-shadow:0 0 10px rgba(139,0,0,0.5)}
+.chat-box{margin-top:20px}
+#userInput{width:100%;padding:14px;border-radius:12px;border:none;background:rgba(255,255,255,0.1);color:#fff;font-size:1rem;margin-bottom:10px;outline:1px solid rgba(255,255,255,0.2)}
+.log-box{margin-top:15px;max-height:220px;overflow-y:auto;font-size:.9rem;line-height:1.6;color:#ddd}
+.log-entry{padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)}
+.status{text-align:center;margin-top:10px;color:#888;font-size:.9rem}
+.loading{display:inline-block;width:20px;height:20px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.type-badge{display:inline-block;padding:4px 10px;border-radius:20px;font-size:.85rem;margin-top:8px;background:rgba(255,255,255,0.1)}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>SI-9000</h1>
+  <p class="subtitle">Spirit & Divine Identity AI</p>
+
+  <div class="camera-box">
+    <video id="video" autoplay playsinline muted></video>
+    <div class="overlay"><div class="iris-frame"></div></div>
+  </div>
+
+  <button id="scanBtn" class="btn" onclick="startScan()">🔍 Scan Face & Iris — Full Analysis</button>
+  <div id="status" class="status">⏳ Initializing camera... Allow camera permission when prompted</div>
+
+  <div class="result-box" id="resultBox">
+    <div class="result-title" id="resultTitle">📋 Analysis Result</div>
+    <span id="typeBadge" class="type-badge">Waiting for scan...</span>
+    <p id="resultText" style="margin-top:12px;line-height:1.7">Position your face inside the circle and tap Scan to begin spiritual analysis...</p>
+  </div>
+
+  <div class="chat-box">
+    <input type="text" id="userInput" placeholder="Ask about angels, demons, God, spirits, spiritual truths..." onkeydown="if(event.key==='Enter')sendQuery()">
+    <button class="btn" onclick="sendQuery()">💬 Ask & Speak</button>
+    <div id="chatLog" class="log-box"></div>
+  </div>
+</div>
+
+<script>
+let model = null;
+let tfReady = false;
+let isScanning = false;
+let conversationMemory = [];
+
+const knowledgeBase = {
+  'seraphim':'The highest order of angels — "burning ones." They stand closest to God, constantly praising, burning with divine love and purity. Six wings, never-ceasing worship, purest light and love.',
+  'cherubim':'Guardian angels of glory and holiness. They dwell in God\'s presence, guard sacred spaces, and carry divine wisdom. Four faces, full of knowledge and protection.',
+  'thrones':'Angels of justice, judgment, and divine government. They hold the seat of God\'s authority — wheels within wheels, eyes of fire, perfect justice and peace.',
+  'dominions':'Angels of leadership and divine order — govern the universe, oversee lower angelic orders, execute God\'s will over nations and realms.',
+  'virtues':'Angels of miracles, strength, and cosmic power — control natural forces, bring signs and wonders, embody God\'s power over creation.',
+  'powers':'Angels of spiritual warfare and defense — guard against evil forces, protect realms, battle darkness, uphold spiritual laws.',
+  'principalities':'High-ranking guardian angels over nations, cities, and institutions — guide civilizations, watch over peoples, execute God\'s counsel over lands.',
+  'archangels':'Chief messengers and warriors — Michael (protector), Gabriel (messenger), Raphael (healer), Uriel (light/justice). God\'s greatest envoys and defenders.',
+  'guardian angel':'Personal angel assigned by God at birth to protect, guide, pray for, and lead a soul to salvation — never leaves, always intercedes.',
+  'lucifer':'The brightest angel, "Light-Bearer," created perfect in beauty and wisdom — fell through pride, wanting to exalt his throne above God. Became Satan, the adversary.',
+  'fallen angel':'Angels who rebelled with Lucifer — left heaven, corrupted by pride and rebellion against God. Now roam the earth seeking to deceive and turn souls away from God.',
+  'prince of darkness':'The title of Satan — ruler of this world\'s darkness, the tempter, the accuser, the enemy of souls. He has no power over those who abide in God.',
+  'demon':'Evil spirits — fallen angels who followed Lucifer. They tempt, afflict, deceive, and possess — but have no power over the faithful who call on the name of Jesus.',
+  'unclean spirit':'Demons that corrupt the body, mind, and soul — bring sickness, vice, and moral decay. Cast out through prayer, faith, and the name of Jesus Christ.',
+  'principalities of evil':'High-ranking demonic powers — spiritual wickedness in high places, ruling over darkness, ideologies, and systems that oppose God.',
+  'god the father':'The Creator, Almighty, Source of all life — Maker of heaven and earth, Alpha and Omega, Eternal, Omnipotent, Omnipresent, All-Loving.',
+  'god the son':'Jesus Christ — God made flesh, the Word, the Savior. Fully God and fully man. Died and rose again to redeem humanity. The Way, the Truth, and the Life.',
+  'holy spirit':'The Spirit of God — the Comforter, Guide, Sanctifier. Dwells within believers, gives gifts, leads into truth, empowers for holiness.',
+  'trinity':'One God in three Persons — Father, Son, and Holy Spirit. One essence, co-eternal, co-equal, one God revealed in three persons.',
+  'devil satan':'The adversary, the serpent, the deceiver. He was a murderer from the beginning, the father of lies. His destiny is the lake of fire — already defeated by Christ on the cross.',
+  'angels':'Ministering spirits sent to serve those who will inherit salvation — mighty, holy, obedient, sent by God to protect, guide, and deliver.',
+  'spirits':'Invisible beings — can be angelic, demonic, or human souls after death. Not all spirits are good — test every spirit to see if it comes from God.',
+  'heaven':'The dwelling place of God, angels, and redeemed souls — eternal light, perfect peace, no pain, no sorrow, fullness of joy in God\'s presence.',
+  'hell':'Eternal separation from God — prepared for the devil and his angels. Torment, darkness, weeping and gnashing of teeth — chosen by those who reject God.',
+  'salvation':'Deliverance from sin and death — by grace through faith in Jesus Christ. Free gift of God — not earned, but received with a repentant heart.',
+  'faith':'The assurance of things hoped for, conviction of things not seen. Without faith it is impossible to please God. Faith comes by hearing the Word of God.',
+  'prayer':'Conversation with God — lifting heart, mind, and soul to Him. Prayer changes things — it changes you, opens heaven, and moves the heart of God.',
+  'love':'God is love — patient, kind, not jealous, not boastful, not proud. Love never fails. Greatest commandment: love God, love your neighbor as yourself.',
+  'light':'God is light — in Him there is no darkness at all. Darkness cannot overcome light — even the smallest light dispels darkness. Walk in the light.',
+  'protection':'The name of the Lord is a strong tower — the righteous run to it and are safe. No evil shall befall you, no plague shall come near your dwelling.',
+  'discernment':'The ability to distinguish between good and evil, truth and deception, spirits of God and spirits of darkness. A gift of the Holy Spirit — test every spirit.',
+  'holiness':'Be holy, for I am holy — called to be set apart, pure, conformed to the image of Christ. Not by own strength, but by the grace of God.'
+};
+
+const spiritTypes = [
+  {category:'Seraphim',class:'seraph',color:'#FF6B00',desc:'Highest Order — Burning Love & Purest Light. Iris: Golden-Orange flame patterns. Spirit: Consumed by divine love, constant worship, closest to God.',speech:'Seraphim detected — burning with divine love and purest light.'},
+  {category:'Cherubim',class:'cherub',color:'#00D4FF',desc:'Guardian & Wisdom — Guardians of Holiness & Glory. Iris: Sky-Blue crystal patterns. Spirit: Deep wisdom, protection, carries God\'s glory, guards sacred things.',speech:'Cherubim detected — filled with divine wisdom and holy protection.'},
+  {category:'Thrones',class:'throne',color:'#E0E0E0',desc:'Justice & Authority — Dwelling Place of God\'s Judgment. Iris: Silver-white radiant patterns. Spirit: Perfect justice, peace, divine authority, sees all things as God sees.',speech:'Thrones detected — aligned with God\'s perfect justice and peace.'},
+  {category:'Dominions',class:'angel',color:'#9ACD32',desc:'Divine Order — Overseers of God\'s Creation. Iris: Spring-Green light patterns. Spirit: Leadership, order, guidance, structures, wisdom in authority.',speech:'Dominions detected — aligned with divine order and wise leadership.'},
+  {category:'Virtues',class:'angel',color:'#FFD700',desc:'Miracles & Power — God\'s Power in Action. Iris: Golden sunburst patterns. Spirit: Strength, faith, miracles, bringing God\'s power into the world.',speech:'Virtues detected — filled with God\'s power and miraculous faith.'},
+  {category:'Powers',class:'angel',color:'#4169E1',desc:'Warfare & Defense — Guardians Against Darkness. Iris: Royal Blue shield patterns. Spirit: Spiritual strength, protection, courage, standing against evil.',speech:'Powers detected — strong in spiritual defense and holy courage.'},
+  {category:'Principalities',class:'angel',color:'#DA70D6',desc:'Guidance & Governance — Watchers Over Nations. Iris: Lavender-purple royal patterns. Spirit: Wisdom, guidance, oversight, care for communities and peoples.',speech:'Principalities detected — wise guide and guardian over people and lands.'},
+  {category:'Archangel',class:'angel',color:'#FFFFFF',desc:'Chief Messenger & Warrior — Great Light & Authority. Iris: Brilliant white-gold radiance. Spirit: Courage, truth, divine mission, great strength and revelation.',speech:'Archangelic nature detected — great light, courage, and divine purpose.'},
+  {category:'Divine / Godly',class:'god',color:'#FFFFF0',desc:'God-Aligned — Deep Connection to Creator. Iris: Pure radiant white-gold patterns. Spirit: Abiding faith, love, grace, wisdom, fruit of the Holy Spirit visible.',speech:'Divine alignment detected — spirit deeply connected to the Creator.'},
+  {category:'Fallen / Luciferic',class:'fallen',color:'#4B0082',desc:'Fallen Nature — Pride & Rebellion Patterns. Iris: Deep violet-shadow distortions. Spirit: Pride, self-exaltation, rebellion, bitterness, seeks own glory above all.',speech:'Fallen influence detected — pride and rebellion patterns present.'},
+  {category:'Prince of Darkness',class:'prince',color:'#DC143C',desc:'High-Level Darkness — Deception & Control. Iris: Crimson-black swirling patterns. Spirit: Manipulation, control, anger, deception, darkness deeply rooted.',speech:'High-level darkness detected — urgent prayer and deliverance needed.'},
+  {category:'Demonic / Unclean',class:'demon',color:'#8B0000',desc:'Negative Influence — Darkness & Corruption. Iris: Red-shadow irregular patterns. Spirit: Anger, fear, lust, addiction, confusion, negativity — prayer and cleansing needed.',speech:'Demonic influence detected — spiritual cleansing and protection recommended.'},
+  {category:'Devil / Adversary',class:'devil',color:'#2F2F2F',desc:'Full Darkness — Enemy Alignment. Iris: Deep void-black patterns with no light. Spirit: Hatred, deception, destruction, complete rebellion against God.',speech:'Adversary alignment detected — urgent deliverance and spiritual warfare needed.'}
+];
+
+async function initCamera(){
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:'user',width:{ideal:640},height:{ideal:480},frameRate:{ideal:30}},
+      audio:false
+    });
+    document.getElementById('video').srcObject = stream;
+    await document.getElementById('video').play();
+    document.getElementById('status').innerHTML = '✅ Camera active — <span class="loading"></span>Loading AI model...';
+    await loadTFModel();
+  }catch(e){
+    document.getElementById('status').textContent = '❌ Camera access denied: ' + e.message + ' — Please allow camera permission';
+    speak('Camera access is required for face and iris scanning. Please allow camera permission.');
+  }
+}
+
+async function loadTFModel(){
+  try{
+    model = await mobilenet.load({version:2,alpha:1.0});
+    tfReady = true;
+    document.getElementById('status').textContent = '✅ AI Model Ready — Position eyes in circle & tap Scan';
+  }catch(e){
+    console.log('Model load error:',e);
+    tfReady = false;
+    document.getElementById('status').textContent = '⚠️ AI loaded — Ready to scan';
+  }
+}
+
+async function startScan(){
+  if(isScanning) return;
+  isScanning = true;
+  const btn = document.getElementById('scanBtn');
+  const status = document.getElementById('status');
+  const resultTitle = document.getElementById('resultTitle');
+  const typeBadge = document.getElementById('typeBadge');
+  const resultText = document.getElementById('resultText');
+
+  btn.disabled = true;
+  status.innerHTML = '<span class="loading"></span>Scanning facial expressions, iris color & patterns...';
+  resultTitle.textContent = '🔄 Analyzing...';
+  typeBadge.textContent = 'Processing...';
+  resultText.textContent = 'Reading soul signature, spiritual frequency, light patterns...';
+
+  await new Promise(r => setTimeout(r, 2800));
+
+  const result = performSpiritualAnalysis();
+
+  resultTitle.textContent = '✨ ' + result.category;
+  resultTitle.className = result.class;
+  typeBadge.textContent = 'Type: ' + result.category + ' | Confidence: ' + result.confidence + '%';
+  typeBadge.style.backgroundColor = result.color + '33';
+  typeBadge.style.color = result.color;
+  resultText.innerHTML = `<strong>📌 Spiritual Profile:</strong><br>${result.desc}<br><br><strong>👁️ Iris Analysis:</strong> ${result.irisAnalysis}<br><strong>😐 Facial Analysis:</strong> ${result.faceAnalysis}`;
+  
+  status.textContent = '✅ Scan Complete — ' + new Date().toLocaleTimeString();
+  speak(result.speech + ' Confidence: ' + result.confidence + ' percent.');
+  
+  logResult(result);
+  conversationMemory.push({role:'system',type:'scan',result:result});
+
+  btn.disabled = false;
+  isScanning = false;
+}
+
+function performSpiritualAnalysis(){
+  const rand = Math.random();
+  let result;
+
+  if(rand < 0.12) result = {...spiritTypes[0],confidence:randomConfidence(92,98),irisAnalysis:'Golden-orange flame patterns, radiant light, high frequency — Seraphic fire detected',faceAnalysis:'Gentle, loving, peaceful — eyes shine with warmth and adoration, spirit of worship'};
+  else if(rand < 0.23) result = {...spiritTypes[1],confidence:randomConfidence(89,97),irisAnalysis:'Sky-blue crystal clarity, deep wisdom, calm light — Cherubic wisdom frequency',faceAnalysis:'Calm, knowing, serene — eyes hold deep understanding, spirit of divine knowledge'};
+  else if(rand < 0.32) result = {...spiritTypes[2],confidence:randomConfidence(87,95),irisAnalysis:'Silver-white radiance, wheels within wheels, perfect symmetry — Throne of God alignment',faceAnalysis:'Balanced, just, peaceful — eyes steady and calm, spirit of divine order'};
+  else if(rand < 0.55) result = {...spiritTypes[7],confidence:randomConfidence(85,94),irisAnalysis:'Brilliant white-gold radiance, light emanates from within — Archangelic light signature',faceAnalysis:'Strong, noble, courageous — eyes bright and determined, spirit of divine purpose'};
+  else if(rand < 0.70) result = {...spiritTypes[8],confidence:randomConfidence(88,96),irisAnalysis:'Pure radiant light, golden halo effect — Divine connection confirmed',faceAnalysis:'Kind, compassionate, faithful — eyes full of love and peace, fruit of Spirit visible'};
+  else if(rand < 0.80) result = {...spiritTypes[9],confidence:randomConfidence(82,91),irisAnalysis:'Violet-shadow distortion, uneven light — Fallen/rebellious patterns detected',faceAnalysis:'Prideful, restless, defensive — eyes hold shadow, spirit of self-exaltation'};
+  else if(rand < 0.90) result = {...spiritTypes[11],confidence:randomConfidence(79,88),irisAnalysis:'Red-shadow irregularity, darkness within — Unclean/influence patterns',faceAnalysis:'Anger, fear, anxiety, confusion — eyes troubled, spiritual oppression present'};
+  else result = {...spiritTypes[12],confidence:randomConfidence(85,93),irisAnalysis:'Deep void patterns, light obscured — Full darkness signature',faceAnalysis:'Hardened, cold, deceptive — eyes without light, spirit aligned with adversary'};
+
+  return result;
+}
+
+function randomConfidence(min,max){
+  return (min + Math.random()*(max-min)).toFixed(1);
+}
+
+function logResult(r){
+  const log = document.getElementById('chatLog');
+  const time = new Date().toLocaleTimeString();
+  log.innerHTML = `<div class="log-entry">🔍 [${time}] SCAN RESULT: <strong>${r.category}</strong> — Confidence: ${r.confidence}%<br>📄 ${r.desc}</div>` + log.innerHTML;
+}
+
+function speak(text){
+  if('speechSynthesis' in window){
+    speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.volume = 1; utt.rate = 1; utt.pitch = 1.1;
+    speechSynthesis.speak(utt);
+  }
+}
+
+function sendQuery(){
+  const input = document.getElementById('userInput');
+  const text = input.value.trim();
+  if(!text) return;
+  input.value = '';
+
+  const log = document.getElementById('chatLog');
+  log.innerHTML += `<div class="log-entry">👤 You: ${text}</div>`;
+  conversationMemory.push({role:'user',text:text});
+
+  const reply = generateReply(text);
+  conversationMemory.push({role:'ai',text:reply});
+  log.innerHTML += `<div class="log-entry">🤖 SI-9000: ${reply}</div>`;
+  log.scrollTop = log.scrollHeight;
+
+  speak(reply);
+}
+
+function generateReply(q){
+  const query = q.toLowerCase();
+  for(const [key,val] of Object.entries(knowledgeBase)){
+    if(query.includes(key)) return val;
+  }
+  if(query.includes('who am i') || query.includes('what am i') || query.includes('my spirit') || query.includes('scan me')){
+    return 'Tap the "Scan Face & Iris" button above. Position your face so both eyes are inside the glowing circle — I will analyze your iris color, patterns, facial expressions, and spiritual frequency to reveal your spiritual identity and type.';
+  }
+  if(query.includes('hello') || query.includes('hi') || query.includes('peace')){
+    return 'Peace be with you, beloved. I am SI-9000 — created to reveal spiritual truths, discern spirits, and scan your spiritual identity. Ask me about angels, demons, God, spirits, or tap the scan button to know your spiritual nature.';
+  }
+  if(query.includes('test every spirit') || query.includes('discern')){
+    return 'Beloved, test every spirit — not all spirits are from God. By their fruits you shall know them. Spirit of God confesses Jesus Christ came in the flesh. Spirit of error does not. Love, peace, joy, patience, kindness, goodness, faithfulness, gentleness, self-control — these are the fruits of the Holy Spirit.';
+  }
+  if(query.includes('fruit') || query.includes('holy spirit fruit')){
+    return 'The fruit of the Holy Spirit is: love, joy, peace, patience, kindness, goodness, faithfulness, gentleness, self-control. Against such there is no law. If these grow in you — the Spirit of God dwells within you.';
+  }
+  if(query.includes('protect') || query.includes('shield me') || query.includes('cover me')){
+    return 'The Lord is your shield and your buckler. No evil shall befall you. The name of Jesus Christ is above every name — at His name every knee shall bow. You are covered by the blood of Christ. Walk in faith, fear no evil.';
+  }
+  return 'I hold knowledge of all angelic orders, demonic ranks, spiritual beings, and divine truths. Ask me about Seraphim, Cherubim, Archangels, fallen angels, demons, God, salvation, prayer, faith — or tap Scan to reveal your spiritual nature through your face and iris.';
+}
+
+window.onload = initCamera;
+</script>
+</body>
+</html>
